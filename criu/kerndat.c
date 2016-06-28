@@ -455,6 +455,16 @@ static int kerndat_iptables_has_xtlocks(void)
 	return 0;
 }
 
+static int kerndat_compat_restore(void)
+{
+	int ret = kdat_compat_sigreturn_test();
+
+	if (ret < 0) /* failure */
+		return ret;
+	kdat.has_compat_sigreturn = !!ret;
+	return 0;
+}
+
 int kerndat_init(void)
 {
 	int ret;
@@ -480,6 +490,8 @@ int kerndat_init(void)
 		ret = kerndat_iptables_has_xtlocks();
 	if (!ret)
 		ret = kerndat_tcp_repair_window();
+	if (!ret)
+		ret = kerndat_compat_restore();
 
 	kerndat_lsm();
 
@@ -511,6 +523,8 @@ int kerndat_init_rst(void)
 		ret = kerndat_iptables_has_xtlocks();
 	if (!ret)
 		ret = kerndat_tcp_repair_window();
+	if (!ret)
+		ret = kerndat_compat_restore();
 
 	kerndat_lsm();
 
@@ -522,6 +536,8 @@ int kerndat_init_cr_exec(void)
 	int ret;
 
 	ret = get_task_size();
+	if (!ret)
+		ret = kerndat_compat_restore();
 
 	return ret;
 }
