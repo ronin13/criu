@@ -123,14 +123,25 @@ int dedup_one_iovec(struct page_read *pr, struct iovec *iov)
 	return 0;
 }
 
+static void put_pagemap(struct page_read *pr)
+{
+	pr->curr_pme++;
+}
+
 static int get_pagemap(struct page_read *pr, struct iovec *iov)
 {
 	PagemapEntry *pe;
 
-	if (pr->curr_pme >= pr->nr_pmes)
-		return 0;
+	for (;;) {
+		if (pr->curr_pme >= pr->nr_pmes)
+			return 0;
 
-	pe = pr->pmes[pr->curr_pme];
+		pe = pr->pmes[pr->curr_pme];
+
+		if (!pe->zero)
+			break;
+		put_pagemap(pr);
+	}
 
 	pagemap2iovec(pe, iov);
 
@@ -145,18 +156,13 @@ static int get_pagemap(struct page_read *pr, struct iovec *iov)
 	return 1;
 }
 
-static void put_pagemap(struct page_read *pr)
-{
-	pr->curr_pme++;
-}
-
 static void skip_pagemap_pages(struct page_read *pr, unsigned long len)
 {
 	if (!len)
 		return;
 
 	pr_debug("\tpr%u Skip %lu bytes from page-dump\n", pr->id, len);
-	if (!pr->pe->in_parent)
+	if (!pr->pe->in_parent && !pr->pe->zero)
 		pr->pi_off += len;
 	pr->cvaddr += len;
 }
@@ -293,6 +299,9 @@ static int read_pagemap_page(struct page_read *pr, unsigned long vaddr, int nr, 
 	if (pr->pe->in_parent) {
 		if (read_parent_page(pr, vaddr, nr, buf) < 0)
 			return -1;
+	} else if (pr->pe->zero) {
+		/* zero mappings should be skipped by get_pagemap */
+		BUG();
 	} else {
 		if (read_local_page(pr, vaddr, len, buf) < 0)
 			return -1;
