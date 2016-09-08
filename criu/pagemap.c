@@ -123,16 +123,12 @@ int dedup_one_iovec(struct page_read *pr, struct iovec *iov)
 	return 0;
 }
 
-static void put_pagemap(struct page_read *pr)
-{
-	pr->curr_pme++;
-}
-
 static int get_pagemap(struct page_read *pr, struct iovec *iov)
 {
 	PagemapEntry *pe;
 
 	for (;;) {
+		pr->curr_pme++;
 		if (pr->curr_pme >= pr->nr_pmes)
 			return 0;
 
@@ -140,7 +136,6 @@ static int get_pagemap(struct page_read *pr, struct iovec *iov)
 
 		if (!pe->zero)
 			break;
-		put_pagemap(pr);
 	}
 
 	pagemap2iovec(pe, iov);
@@ -191,7 +186,6 @@ static int seek_pagemap_page(struct page_read *pr, unsigned long vaddr,
 
 		if (iov_end <= vaddr) {
 			skip_pagemap_pages(pr, iov_end - pr->cvaddr);
-			put_pagemap(pr);
 new_pagemap:
 			ret = get_pagemap(pr, &iov);
 			if (ret <= 0)
@@ -352,7 +346,7 @@ static void reset_pagemap(struct page_read *pr)
 {
 	pr->cvaddr = 0;
 	pr->pi_off = 0;
-	pr->curr_pme = 0;
+	pr->curr_pme = -1;
 	pr->pe = NULL;
 
 	/* FIXME: take care of bunch */
@@ -419,7 +413,8 @@ static int init_pagemaps(struct page_read *pr)
 	if (!pr->pmes)
 		return -1;
 
-	pr->nr_pmes = pr->curr_pme = 0;
+	pr->nr_pmes = 0;
+	pr->curr_pme = -1;
 
 	while (1) {
 		int ret = pb_read_one_eof(pr->pmi, &pr->pmes[pr->nr_pmes],
@@ -507,7 +502,6 @@ int open_page_read_at(int dfd, int pid, struct page_read *pr, int pr_flags)
 	}
 
 	pr->get_pagemap = get_pagemap;
-	pr->put_pagemap = put_pagemap;
 	pr->read_pages = read_pagemap_page;
 	pr->close = close_page_read;
 	pr->skip_pages = skip_pagemap_pages;
