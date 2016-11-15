@@ -770,6 +770,7 @@ class criu:
 		self.__lazy_pages = (opts['lazy_pages'] and True or False)
 		self.__restore_sibling = (opts['sibling'] and True or False)
 		self.__join_ns = (opts['join_ns'] and True or False)
+		self.__empty_ns = (opts['empty_ns'] and True or False)
 		self.__fault = (opts['fault'])
 		self.__script = opts['script']
 		self.__sat = (opts['sat'] and True or False)
@@ -897,6 +898,8 @@ class criu:
 
 		if self.__leave_stopped:
 			a_opts += ['--leave-stopped']
+		if self.__empty_ns:
+			a_opts += ['--empty-ns', 'net']
 
 		self.__criu_act(action, opts = a_opts + opts)
 		if self.__mdedup and self.__iter > 1:
@@ -918,6 +921,9 @@ class criu:
 		if self.__join_ns:
 			r_opts.append("--join-ns")
 			r_opts.append("net:%s" % join_ns_file)
+		if self.__empty_ns:
+			r_opts += ['--empty-ns', 'net']
+			r_opts += ['--action-script', os.getcwd() + '/empty-netns-prep.sh']
 
 		self.__prev_dump_iter = None
 		criu_dir = os.path.dirname(os.getcwd())
@@ -1356,7 +1362,7 @@ class launcher:
 		self.__nr += 1
 		self.__show_progress()
 
-		nd = ('nocr', 'norst', 'pre', 'iters', 'page_server', 'sibling', 'stop', 'lazy_pages',
+		nd = ('nocr', 'norst', 'pre', 'iters', 'page_server', 'sibling', 'stop', 'lazy_pages', 'empty_ns',
 				'fault', 'keep_img', 'report', 'snaps', 'sat', 'script', 'rpc',
 				'join_ns', 'dedup', 'sbs', 'freezecg', 'user', 'dry_run', 'noauto_dedup')
 		arg = repr((name, desc, flavor, {d: self.__opts[d] for d in nd}))
@@ -1602,6 +1608,8 @@ def run_tests(opts):
 			# remove ns and uns flavor in join_ns
 			if opts['join_ns']:
 				run_flavs -= set(['ns', 'uns'])
+			if opts['empty_ns']:
+				run_flavs -= set(['h'])
 
 			if run_flavs:
 				l.run_test(t, tdesc, run_flavs)
@@ -1794,6 +1802,7 @@ rp.add_argument("-x", "--exclude", help = "Exclude tests from --all run", action
 
 rp.add_argument("--sibling", help = "Restore tests as siblings", action = 'store_true')
 rp.add_argument("--join-ns", help = "Restore tests and join existing namespace", action = 'store_true')
+rp.add_argument("--empty-ns", help = "Restore tests in empty net namespace", action = 'store_true')
 rp.add_argument("--pre", help = "Do some pre-dumps before dump (n[:pause])")
 rp.add_argument("--snaps", help = "Instead of pre-dumps do full dumps", action = 'store_true')
 rp.add_argument("--dedup", help = "Auto-deduplicate images on iterations", action = 'store_true')
