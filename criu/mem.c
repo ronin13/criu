@@ -112,6 +112,9 @@ bool should_dump_page(VmaEntry *vmae, u64 pme)
 	if (pme & (PME_PRESENT | PME_SWAP))
 		return true;
 
+	if (vmae->madv & (1ul << MADV_DONTDUMP))
+		return false;
+
 	return false;
 }
 
